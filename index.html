@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>ENV-ROVER -Environment Rover 1.0 design-vedant v salaskar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.cdnfonts.com/css/rogan" rel="stylesheet">
+<link href="https://fonts.cdnfonts.com/css/manjari-2" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-fixed-dim": "#d8b9ff",
+                    "on-primary-fixed-variant": "#005225",
+                    "surface-container-low": "#f3f3f4",
+                    "on-error": "#ffffff",
+                    "on-background": "#1a1c1c",
+                    "secondary-fixed": "#eedcff",
+                    "surface-container": "#eeeeee",
+                    "secondary-container": "#caa1ff",
+                    "on-error-container": "#93000a",
+                    "error": "#ba1a1a",
+                    "on-primary": "#ffffff",
+                    "outline-variant": "#bccabb",
+                    "primary-container": "#008740",
+                    "surface-muted": "#F7F9F8",
+                    "on-surface": "#1a1c1c",
+                    "tertiary": "#5c5c5c",
+                    "on-secondary-fixed": "#290054",
+                    "on-primary-fixed": "#00210b",
+                    "on-secondary-container": "#573187",
+                    "brand-indigo": "#300060",
+                    "surface-container-highest": "#e2e2e2",
+                    "surface-bright": "#f9f9f9",
+                    "outline": "#6d7b6d",
+                    "border-light": "#E2E2E2",
+                    "error-container": "#ffdad6",
+                    "action-green": "#00A651",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-container": "#f7fff3",
+                    "surface-dim": "#dadada",
+                    "on-tertiary-fixed-variant": "#474747",
+                    "on-secondary-fixed-variant": "#583389",
+                    "on-tertiary": "#ffffff",
+                    "ink-grey": "#333333",
+                    "tertiary-fixed-dim": "#c8c6c6",
+                    "surface-tint": "#006d33",
+                    "inverse-surface": "#2f3131",
+                    "primary": "#006b32",
+                    "on-surface-variant": "#3d4a3e",
+                    "secondary": "#714ca2",
+                    "tertiary-container": "#757474",
+                    "background": "#f9f9f9",
+                    "tertiary-fixed": "#e4e2e1",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#1b1c1c",
+                    "surface": "#f9f9f9",
+                    "primary-fixed": "#78fc9c",
+                    "surface-variant": "#e2e2e2",
+                    "inverse-primary": "#5adf82",
+                    "pure-white": "#FFFFFF",
+                    "primary-fixed-dim": "#5adf82",
+                    "on-tertiary-container": "#fffcfb",
+                    "surface-container-high": "#e8e8e8",
+                    "inverse-on-surface": "#f0f1f1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "64px",
+                    "stack-sm": "24px",
+                    "stack-md": "48px",
+                    "base": "8px",
+                    "container-max": "1280px",
+                    "margin-mobile": "20px",
+                    "gutter": "32px",
+                    "stack-lg": "80px"
+            },
+            "fontFamily": {
+                    "label-md": ["Rogan", "sans-serif"],
+                    "display-lg": ["Rogan", "sans-serif"],
+                    "headline-xl": ["Rogan", "sans-serif"],
+                    "headline-lg": ["Rogan", "sans-serif"],
+                    "label-sm": ["Rogan", "sans-serif"],
+                    "body-lg": ["Manjari", "sans-serif"],
+                    "headline-lg-mobile": ["Rogan", "sans-serif"],
+                    "body-md": ["Manjari", "sans-serif"],
+                    "headline-md": ["Rogan", "sans-serif"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "display-lg": ["64px", {"lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "800"}],
+                    "headline-xl": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.015em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body, span, div, p {
+            font-family: 'Manjari', sans-serif;
+        }
+        h1, h2, h3, h4, h5, h6, button, a {
+            font-family: 'Rogan', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .precision-border {
+            border: 1px solid #E2E2E2;
+        }
+        .gradient-mesh {
+            background: radial-gradient(at 0% 0%, rgba(0, 166, 81, 0.03) 0, transparent 50%),
+                        radial-gradient(at 50% 0%, rgba(48, 0, 96, 0.03) 0, transparent 50%);
+        }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .modal-close {
+            margin-top: 1rem;
+            background: #00A651;
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-family: 'Rogan', sans-serif;
+        }
+        /* Responsive typography scaling */
+        @media (max-width: 768px) {
+            .text-display-lg { font-size: 36px !important; line-height: 44px !important; }
+            .text-headline-xl { font-size: 32px !important; line-height: 40px !important; }
+            .text-headline-lg { font-size: 24px !important; line-height: 32px !important; }
+            .text-headline-md { font-size: 20px !important; line-height: 28px !important; }
+        }
+        /* Ensure images are responsive */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        /* Smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-action-green selection:text-white">
+<div class="modal-overlay" id="contactModal">
+    <div class="modal-content">
+        <h3 class="font-headline-md text-headline-md text-brand-indigo mb-4">Contact Me</h3>
+        <p class="font-body-md text-body-md text-tertiary mb-6">Feel free to reach out via email:</p>
+        <a class="font-body-md text-body-md text-action-green break-all" href="mailto:salaskarvedant66@gmail.com">salaskarvedant66@gmail.com</a>
+        <br>
+        <button class="modal-close font-label-md text-label-md" onclick="closeModal()">Close</button>
+    </div>
+</div>
+<header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-md border-b border-border-light h-20">
+<div class="flex justify-between items-center h-full px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
+<div class="flex items-center gap-base">
+<span class="font-display-lg text-headline-md tracking-tighter text-on-background">ENV-ROVER</span>
+</div>
+<nav class="hidden md:flex items-center gap-gutter">
+<a class="font-label-md text-label-md text-tertiary hover:text-on-background transition-colors" href="#mission">Mission</a>
+<a class="font-label-md text-label-md text-tertiary hover:text-on-background transition-colors" href="#tech">The Tech</a>
+</nav>
+<div class="flex items-center gap-base">
+<button class="font-label-md text-label-md bg-action-green text-white px-6 py-2 rounded-lg hover:opacity-90 transition-all" onclick="openModal()">Contact Me</button>
+</div>
+</div>
+</header>
+
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="relative overflow-hidden gradient-mesh py-stack-lg min-h-[80vh] flex items-center">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop w-full grid grid-cols-1 md:grid-cols-12 gap-gutter items-center">
+<div class="md:col-span-7">
+<div class="inline-flex items-center px-3 py-1 rounded-full bg-secondary-container/20 text-brand-indigo mb-6">
+</div>
+<h1 class="font-display-lg text-display-lg text-brand-indigo mb-6 max-w-2xl">
+                        ENVIRONMENT ROVER <br>
+<span class="text-action-green">(ENV-ROVER 1.0)</span>
+</h1>
+<p class="font-body-lg text-body-lg text-tertiary mb-10 max-w-xl">Environment and Economy, hand in hand using technology.</p>
+<div class="flex flex-wrap gap-stack-sm">
+<a class="bg-action-green text-white px-8 py-4 rounded-xl font-label-md text-label-md shadow-sm hover:opacity-90 transition-all flex items-center gap-2 no-underline" href="docs/ENV-ROVER_Technical_Doc.pdf" target="_blank" style="font-family: manjari;" >See technical documentation pdf<span class="material-symbols-outlined">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="md:col-span-5 relative mt-8 md:mt-0">
+<div class="absolute inset-0 bg-primary/5 rounded-full blur-3xl"></div>
+<img alt="ENV-ROVER 1.0 Main View" class="relative z-10 w-full h-auto transform hover:scale-105 transition-transform duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvlCx9BBS2BaUncUCDF2ZNViNNelQxi89ff97gkOCLRUwCPOJRYnfwkzMR5zPBSBeHWhr0PHN25vYYxVj2EaipQB-L4oMrr1CXmUOPe9fsXsFKuWsbn78IkYNNCX3XCsbaoCk67J-xOId6x_NZNtdM-TxA0eNisz-wjLIUoU_yBqeb-IDA9KyyJEwJ2ro2uQuPnup4SqbkH4rA_L1DkaABInZs-XVzqybUZqJy-Okm7WvV8j8lf5kHpZr4aGSiilowexhzCo27vUs">
+</div>
+</div>
+</section>
+
+<section class="py-stack-lg bg-white border-y border-border-light" id="mission">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter items-center">
+<div class="md:col-span-5">
+<h2 class="font-headline-xl text-headline-xl text-brand-indigo mb-6">The Motive</h2>
+<p class="font-body-lg text-body-lg text-tertiary">
+                            To maximize environmental sanitation efficiency by automating theidentification, collection, and safe disposal of pollutants throughincineration or govt-verified green disposal methods.
+                        </p>
+</div>
+<div class="md:col-span-6 md:col-start-7 mt-8 md:mt-0">
+<div class="precision-border p-stack-sm rounded-xl bg-surface-muted">
+<div class="flex items-start gap-stack-sm">
+<div class="bg-primary-container p-3 rounded-lg text-white">
+<span class="material-symbols-outlined">eco</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md text-on-background mb-4">Inception of env-rover idea</h3>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                                        On 14th May 2026, I was travelling by road from my native place(Konkan) to Mumbai. On the way i observed plastic bags, bottles and waste along the roads and dumps. This induced a idea if we could use autonomous vehicles to clean road-side waste and dumps.
+                                    </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="py-stack-lg" id="tech">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop">
+<div class="text-center mb-stack-lg">
+<h2 class="font-headline-xl text-headline-xl text-brand-indigo mb-4">The Technology</h2>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter items-center">
+<div class="space-y-gutter">
+<div class="precision-border p-6 rounded-xl bg-white hover:border-action-green transition-colors group">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md text-action-green">1)</span>
+<span class="material-symbols-outlined text-tertiary group-hover:text-action-green">solar_power</span>
+</div>
+<h4 class="font-headline-md text-headline-md mb-2">Solar Panels</h4>
+<p class="font-body-md text-body-md text-tertiary">High-efficiency photovoltaic array for extended autonomous runtime in remote locations.</p>
+</div>
+<div class="precision-border p-6 rounded-xl bg-white hover:border-action-green transition-colors group">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md text-action-green">2)</span>
+<span class="material-symbols-outlined text-tertiary group-hover:text-action-green">precision_manufacturing</span>
+</div>
+<h4 class="font-headline-md text-headline-md mb-2">Collecting Grip</h4>
+<p class="font-body-md text-body-md text-tertiary">Industrial-grade articulated arm designed for multi-material sorting and secure pickup.</p>
+</div>
+</div>
+
+<div class="relative py-12">
+<img alt="ENV-ROVER 1.0 Engineering Diagram" class="w-full h-auto z-10 relative" src="./envrover_model_1.0.png">
+<div class="absolute inset-0 flex items-center justify-center -z-10">
+<div class="w-64 h-64 bg-action-green/10 rounded-full blur-[100px]"></div>
+</div>
+</div>
+
+<div class="space-y-gutter">
+<div class="precision-border p-6 rounded-xl bg-white hover:border-action-green transition-colors group">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md text-action-green">3)</span>
+<span class="material-symbols-outlined text-tertiary group-hover:text-action-green">tire_repair</span>
+</div>
+<h4 class="font-headline-md text-headline-md mb-2">Hard Terrain Tyres</h4>
+<p class="font-body-md text-body-md text-tertiary">Suspended high-traction rubber for navigation across mud, sand, and rubble.</p>
+</div>
+<div class="precision-border p-6 rounded-xl bg-white hover:border-action-green transition-colors group">
+<div class="flex justify-between items-center mb-2">
+<span class="font-label-md text-label-md text-action-green">4)</span>
+<span class="material-symbols-outlined text-tertiary group-hover:text-action-green">sprinkler</span>
+</div>
+<h4 class="font-headline-md text-headline-md mb-2">Disinfectant Sprayer</h4>
+<p class="font-body-md text-body-md text-tertiary">Integrated chemical dispersal unit for post-collection site sanitation.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter mt-stack-lg">
+<div class="flex gap-stack-sm p-stack-sm bg-surface-muted rounded-2xl border border-border-light">
+<span class="material-symbols-outlined text-4xl text-brand-indigo">location_on</span>
+<div>
+<h5 class="font-headline-md text-headline-md mb-2">Location Deployment &amp; Pickup</h5>
+<p class="font-body-md text-body-md text-tertiary">Point-to-point GPS navigation allowing for remote release and automated recovery after operational windows.</p>
+</div>
+</div>
+<div class="flex gap-stack-sm p-stack-sm bg-surface-muted rounded-2xl border border-border-light">
+<span class="material-symbols-outlined text-4xl text-brand-indigo">science</span>
+<div>
+<h5 class="font-headline-md text-headline-md mb-2">Inspiration</h5>
+<p class="font-body-md text-body-md text-tertiary">NASA's Persevere rover and remote-controlled monster trucks😅</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+
+<section class="py-stack-lg bg-surface-bright" id="ops">
+<div class="max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop text-center">
+<h2 class="font-headline-xl text-headline-xl text-brand-indigo mb-4">My Goal</h2>
+<p class="font-body-lg text-body-lg text-tertiary max-w-2xl mx-auto">
+                   This idea is proposed in good faith towards a cleaner environment andconsequently brighter future for India and Indians.
+                </p>
+</div>
+</section>
+
+</main>
+
+<footer class="bg-surface-muted border-t border-border-light py-stack-md">
+<div class="flex flex-col md:flex-row justify-between items-center px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto w-full">
+<div class="mb-stack-sm md:mb-0">
+<span class="font-headline-md text-headline-md text-primary">Proposed by <i style="font-family:Microsoft Sans Serif; color:darkblue">Vedant V Salaskar</i></span>
+</div>
+<div class="flex flex-wrap justify-center gap-stack-sm">
+<a class="font-body-md text-body-md text-tertiary hover:text-primary transition-colors no-underline" href="docs/ENV-ROVER_Technical_Doc.pdf" target="_blank">Technical Docs</a>
+<a class="font-body-md text-body-md text-tertiary hover:text-primary transition-colors no-underline" href="#" onclick="openModal(); return false;">Contact Me</a>
+</div>
+</div>
+</footer>
+
+<script>
+function openModal() {
+    document.getElementById('contactModal').classList.add('active');
+}
+function closeModal() {
+    document.getElementById('contactModal').classList.remove('active');
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('contactModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+console.log("you won't find anything here 😅..only my email and tech pdf(fuck ya😅)")
+</script>
+
+</body>
+</html>
