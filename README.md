@@ -40,7 +40,6 @@ Its childish i know but motivated children change the world isn't it😅?
 
 ## Want first hand experience
  > <i>We created the envrover implemento game to help you understand how envrover would work in a first person, interactive, gamified and dynamic way at <a href="https://envroverimplemento.netlify.app" target="_blank">https://envroverimplemento.netlify.app</a></i>
-link: https://envroverimplemento.netlify.app (incase github strips the link)
 
 ## Work in progress
 > - You can see progress in ./v1.0/worklogs/whatididanddoing.md
