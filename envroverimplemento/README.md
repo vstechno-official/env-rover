@@ -43,7 +43,7 @@ Its childish i know but motivated children change the world isn't it😅?
 link: https://envroverimplemento.netlify.app (incase github strips the link)
 
 ## Work in progress
-> - You can see progress in ./1.0/worklogs/whatididanddoing.md
+> - You can see progress in ./v1.0/worklogs/whatididanddoing.md
 
 ***
 
