@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="envrover_model_1.0.jpg" alt="ENV-ROVER 1.0 Design Model" width="600"/>
+  <img src="v1.0/envrover_model_1.0.png" alt="ENV-ROVER 1.0 Design Model" width="600"/>
 </p>
 
 <h1 align="center">🌍 ENV-ROVER 1.0</h1>
