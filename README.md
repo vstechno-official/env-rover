@@ -6,7 +6,7 @@ three autonomous rovers, one dirty grid, zero humans needed. this is the simulat
 
 the whole thing runs on a split brain:
 
-- **gemini 2.5 flash** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else.
+- **gemini 3.8 flash** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else.
 - **a-star + manhattan distance** is the driver. once a rover gets its target, classic pathfinding walks it there step by step. no tokens burned on steering.
 
 the llm never touches the wheel. the math never gets creative. each covers the other's weakness and the swarm just cleans.
@@ -18,7 +18,7 @@ i started this after a road trip from konkan to mumbai — kilometers of plastic
 ## how it works (under the hood)
 
 ```
-   gemini 2.5 flash                    a-star + manhattan
+   gemini 3.8 flash                    a-star + manhattan
    task allocator        ->            steering
    (who goes after what)               (how to actually get there)
 ```
@@ -34,7 +34,7 @@ why split it like this: llm calls are slow and cost money but they're good at ju
 ### repo layout
 
 ```
-core/llm_brain.py          gemini 2.5 flash task allocator, async, json + greedy fallback
+core/llm_brain.py          gemini 3.8 flash task allocator, async, json + greedy fallback
 core/swarm_async.py        SwarmSim engine: allocate -> drive -> scoop, every tick
 simulation/grid_env.py     numpy grid world, manhattan, a-star, trash, walls
 simulation/visualizer.py   pygame renderer, retro-hacker terminal aesthetic

@@ -80,10 +80,12 @@ def _fx(surface):
 
 
 def _draw_hud(sim, surface):
+    from core import llm_brain
+
     fonts = _state["fonts"]
     w = surface.get_width()
     surface.blit(fonts["title"].render("ENV-ROVER // SWARM SIM", True, TEXT_BRIGHT), (PAD, 10))
-    mode = "gemini-2.5-flash allocs - a-star drives" if sim.live else "offline greedy allocs - a-star drives"
+    mode = f"{llm_brain.DEFAULT_MODEL} allocs - a-star drives" if sim.live else "offline greedy allocs - a-star drives"
     surface.blit(fonts["small"].render(mode, True, TEXT_DIM), (PAD, 30))
 
     tick = fonts["hud"].render(f"TICK {sim.tick_count:03d}", True, ACCENT)

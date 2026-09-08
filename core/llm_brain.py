@@ -11,7 +11,7 @@ except ImportError:
 # keys go in .env (see .env.example). never commit the real one lol
 load_dotenv()
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 SYSTEM_PROMPT = (
     "you are the task allocator for a swarm of trash-collecting rovers on a 2d grid. "
@@ -60,6 +60,8 @@ async def allocate_tasks(rover_positions: dict, trash: list, client=None) -> dic
             config={
                 "system_instruction": SYSTEM_PROMPT,
                 "response_mime_type": "application/json",
+                # tiny allocation call, no reason to burn thinking tokens on it
+                "thinking_config": {"thinking_level": "low"},
             },
         )
     except Exception as e:
