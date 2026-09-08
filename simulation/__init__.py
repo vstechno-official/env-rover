@@ -1,0 +1,1 @@
+# world state. the grid, the trash, the rovers

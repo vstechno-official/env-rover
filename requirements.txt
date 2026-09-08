@@ -1,0 +1,5 @@
+numpy
+google-genai
+python-dotenv
+# psa: asyncio is already stdlib. the pypi "asyncio" package is some ancient
+# backport that can shadow the real one and wreck your install. dont pip install it lol
