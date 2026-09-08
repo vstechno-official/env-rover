@@ -39,7 +39,7 @@ core/swarm_async.py        SwarmSim engine: allocate -> drive -> scoop, every ti
 simulation/grid_env.py     numpy grid world, manhattan, a-star, trash, walls
 simulation/visualizer.py   pygame renderer, retro-hacker terminal aesthetic
 generate_gif.py            runs the swarm headless and records assets/demo.gif
-tests/test_sim.py          51 checks, zero network needed
+tests/test_sim.py          46 checks, zero network needed
 ```
 
 ### roadmap, honest version
