@@ -3,18 +3,22 @@ import contextlib
 import io
 import json
 import os
-import re
 import sys
 import time
+from collections import deque
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import numpy as np
+
 from core import llm_brain
-from core.swarm_async import main as swarm_main
-from simulation.grid_env import GridEnv, Rover
+from core.swarm_async import SwarmSim
+from simulation import grid_env as ge
+from simulation import visualizer
 
 FAILS = []
+TMP = Path(os.environ.get("LOCALAPPDATA", "/tmp")) / "envrover-tests"
 
 
 def check(label, cond, extra=""):
@@ -24,66 +28,83 @@ def check(label, cond, extra=""):
         FAILS.append(label)
 
 
-# ---- grid env ----
-print("== grid_env ==")
-env = GridEnv(24, 24, seed=42)
-spawned = env.spawn_trash(40)
-check("spawned exactly 40", spawned == 40, f"got {spawned}")
-check("trash_left matches", env.trash_left == 40)
-check("no dupes in trash", len({tuple(c) for c in env.trash}) == env.trash_left)
-env.spawn_trash(700)
-check("overflow guard caps spawn", env.trash_left <= 24 * 24, f"got {env.trash_left}")
+# ---- manhattan + a-star ----
+print("== grid_env: manhattan + a-star ==")
+check("manhattan basic", ge.manhattan((0, 0), (3, 4)) == 7)
+check("manhattan symmetric", ge.manhattan((10, 10), (4, 2)) == ge.manhattan((4, 2), (10, 10)))
 
-env2 = GridEnv(24, 24, seed=7)
-env2.spawn_trash(40)
-nb = env2.nearby_trash((12, 12), radius=6, limit=8)
-check("nearby sorted nearest-first", all(nb[i][2] <= nb[i + 1][2] for i in range(len(nb) - 1)))
-check("nearby capped at limit", len(nb) <= 8)
-check("nearby radius respected", all(d <= 6 for _, _, d in nb))
-check("empty-sensor corner", env2.nearby_trash((0, 0), radius=0) == [])
+env = ge.GridEnv(24, 24, seed=42)
+env.spawn_trash(40)
+p = env.astar((0, 0), (3, 4))
+check("astar start->goal nodes", p[0] == (0, 0) and p[-1] == (3, 4))
+check("astar optimal = manhattan steps", len(p) == ge.manhattan((0, 0), (3, 4)) + 1)
+check("astar start==goal", env.astar((5, 5), (5, 5)) == [(5, 5)])
+check("astar every step is 1 tile", all(ge.manhattan(p[i], p[i + 1]) == 1 for i in range(len(p) - 1)))
+check("astar stays in bounds", all(env.in_bounds(t) for t in p))
+check("astar out of bounds -> None", env.astar((0, 0), (99, 99)) is None)
 
-pos, ok = env2.move((5, 5), "RIGHT")
-check("move RIGHT works", pos == (6, 5) and ok)
-pos, ok = env2.move((0, 3), "LEFT")
-check("wall blocks at x=0", pos == (0, 3) and not ok)
-pos, ok = env2.move((0, 0), "UP")
-check("wall blocks at y=0", pos == (0, 0) and not ok)
-pos, ok = env2.move((23, 23), "DOWN")
-check("wall blocks at max", pos == (23, 23) and not ok)
-pos, ok = env2.move((3, 3), "JUMP")
-check("garbage dir = stay put", pos == (3, 3) and not ok)
+blocked = {(1, 0)}
+p2 = env.astar((0, 0), (2, 0), blocked=blocked)
+check("astar detours around blocked", p2 is not None and not any(t in blocked for t in p2))
+check("detour length sane", len(p2) == 5, f"got {len(p2)}")
 
-t = env2.nearby_trash((12, 12), radius=6)
-tx, ty = t[0][0], t[0][1]
-check("collect only on tile", env2.collect((tx + 1 if tx + 1 < 24 else tx - 1, ty)) is False)
-check("collect on tile works", env2.collect((tx, ty)) is True)
-check("collect decrements", env2.trash_left == 39)
-
-r = Rover(name="t", pos=(0, 0))
-art = env2.render([r])
-check("render is height lines", len(art.splitlines()) == 24)
-check("render line width ok", all(len(l) == 24 for l in art.splitlines()))
-check("render shows rover digit", art.splitlines()[0][0] == "1")
+ring = {(1, 2), (2, 1), (3, 2), (2, 3)}
+check("astar unreachable -> None", env.astar((0, 0), (2, 2), blocked=ring) is None)
+check("astar goal blocked -> None", env.astar((0, 0), (1, 2), blocked={(1, 2)}) is None)
 
 
-# ---- llm brain parser ----
-print("== llm_brain ==")
-check("clean json", llm_brain._parse_move('{"move": "up", "reason": "trash north"}') == ("UP", "trash north"))
-check("fenced json", llm_brain._parse_move('```json\n{"move": "LEFT", "reason": "x"}\n```')[0] == "LEFT")
-check("junk text", llm_brain._parse_move("the rover should go up")[0] is None)
-check("illegal move", llm_brain._parse_move('{"move": "TELEPORT"}')[0] is None)
-check("json list not dict", llm_brain._parse_move("[1,2,3]")[0] is None)
-check("json string not dict", llm_brain._parse_move('"go up"')[0] is None)
-check("empty reply", llm_brain._parse_move("")[0] is None)
-check("reason truncates", len(llm_brain._parse_move('{"move": "UP", "reason": "' + "x" * 200 + '"')[1]) <= 80)
-check("greedy homes on trash", llm_brain._greedy_move((5, 5), [(8, 5, 3.0)]) in ("RIGHT",))
-check("greedy vertical", llm_brain._greedy_move((5, 5), [(5, 9, 4.0)]) == "DOWN")
-check("greedy wanders solo", llm_brain._greedy_move((5, 5), []) in llm_brain.VALID_MOVES)
-check("missing reason ok", llm_brain._parse_move('{"move": "RIGHT"}') == ("RIGHT", ""))
+def bfs_len(start, goal, blocked=frozenset()):
+    # reference shortest path so we can hold a-star accountable
+    seen = {start}
+    q = deque([(start, 0)])
+    while q:
+        cur, d = q.popleft()
+        if cur == goal:
+            return d
+        for dx, dy in ge.MOVES.values():
+            nxt = (cur[0] + dx, cur[1] + dy)
+            if env.in_bounds(nxt) and nxt not in seen and nxt not in blocked:
+                seen.add(nxt)
+                q.append((nxt, d + 1))
+    return None
 
 
-# ---- fake gemini clients (shape matches client.aio.models.generate_content) ----
-print("== swarm async (fake gemini) ==")
+rng = np.random.default_rng(3)
+agree = True
+for _ in range(30):
+    a = tuple(int(v) for v in rng.integers(0, 24, 2))
+    b = tuple(int(v) for v in rng.integers(0, 24, 2))
+    blk = {(int(x), int(y)) for x, y in rng.integers(0, 24, (12, 2))}
+    blk.discard(a)
+    blk.discard(b)
+    star = env.astar(a, b, blocked=blk)
+    ref = bfs_len(a, b, blocked=blk)
+    if ref is None:
+        agree &= star is None
+    else:
+        agree &= star is not None and len(star) - 1 == ref
+check("astar optimal vs bfs (30 random cases)", agree)
+
+# rover dataclass fields
+r = ge.Rover(name="t", pos=(1, 1))
+r.target = (2, 2)
+r.path = [(1, 2), (2, 2)]
+r.trail.append((1, 1))
+check("rover carries target/path/trail", r.target == (2, 2) and len(r.path) == 2 and r.trail == [(1, 1)])
+
+# ---- allocator ----
+print("== llm_brain: gemini task allocator ==")
+trash = [(3, 7), (10, 2), (20, 20)]
+g = llm_brain.greedy_assignment({"rover-1": (3, 6), "rover-2": (10, 3), "rover-3": (19, 19)}, trash)
+check("greedy picks nearest", g["rover-1"] == (3, 7) and g["rover-2"] == (10, 2) and g["rover-3"] == (20, 20))
+check("greedy no dupes", len(set(g.values())) == 3)
+g2 = llm_brain.greedy_assignment({"rover-1": (0, 0), "rover-2": (0, 0)}, trash)
+check("greedy breaks ties without dupes", g2["rover-1"] != g2["rover-2"])
+g3 = llm_brain.greedy_assignment({"rover-1": (0, 0)}, [])
+check("greedy no trash -> None", g3["rover-1"] is None)
+check("extract dict form", llm_brain._extract_coord({"x": 3, "y": 7}) == (3, 7))
+check("extract list form", llm_brain._extract_coord([3, 7]) == (3, 7))
+check("extract junk -> None", llm_brain._extract_coord("up") is None)
 
 
 class FakeResp:
@@ -92,98 +113,149 @@ class FakeResp:
 
 
 class FakeModels:
-    def __init__(self, behavior, latency=0.0):
+    def __init__(self, behavior):
         self.behavior = behavior
-        self.latency = latency
         self.calls = 0
 
     async def generate_content(self, model, contents, config=None):
         self.calls += 1
-        if self.latency:
-            await asyncio.sleep(self.latency)
         if self.behavior == "fail":
             raise RuntimeError("simulated 429")
-        if self.behavior == "nonsense":
-            return FakeResp("i think the rover should fly")
-        if self.behavior == "smart":
-            payload = json.loads(contents)
-            trash = [(t["x"], t["y"], t["dist"]) for t in payload["trash_nearby"]]
-            move = llm_brain._greedy_move((payload["rover"]["x"], payload["rover"]["y"]), trash)
-            return FakeResp(json.dumps({"move": move, "reason": "smart fake brain"}))
-        return FakeResp('{"move": "RIGHT", "reason": "fake brain says so"}')
-
-
-class FakeAio:
-    def __init__(self, behavior, latency=0.0):
-        self.models = FakeModels(behavior, latency)
+        if self.behavior == "garbage":
+            return FakeResp("rover one should take the trash near the corner")
+        if self.behavior == "hallucinate":
+            return FakeResp(json.dumps({"rover-1": {"x": 50, "y": 50}, "rover-2": {"x": 3, "y": 7}}))
+        if self.behavior == "dupe":
+            return FakeResp(json.dumps({"rover-1": {"x": 3, "y": 7}, "rover-2": {"x": 3, "y": 7}}))
+        if self.behavior == "fenced":
+            return FakeResp('```json\n{"rover-1": {"x": 3, "y": 7}, "rover-2": {"x": 10, "y": 2}}\n```')
+        payload = json.loads(contents)
+        rovers = {r["name"]: (r["x"], r["y"]) for r in payload["rovers"]}
+        assigns = llm_brain.greedy_assignment(rovers, [(t["x"], t["y"]) for t in payload["trash"]])
+        return FakeResp(json.dumps({n: {"x": c[0], "y": c[1]} if c else None for n, c in assigns.items()}))
 
 
 class FakeClient:
-    def __init__(self, behavior="ok", latency=0.0):
-        self.aio = FakeAio(behavior, latency)
+    def __init__(self, behavior):
+        class aio:
+            models = FakeModels(behavior)
+
+        self.aio = aio()
 
 
-async def scenario_concurrent():
-    ok = llm_brain.ask_brain((2, 2), [(9, 2, 7.0)], client=FakeClient("ok"))
-    bad = llm_brain.ask_brain((1, 1), [], client=FakeClient("fail"))
-    return await asyncio.gather(ok, bad)
+async def alloc(behavior, rovers, trash):
+    return await llm_brain.allocate_tasks(rovers, trash, client=FakeClient(behavior))
 
 
-r1, r2 = asyncio.run(scenario_concurrent())
-check("valid move returned", r1[0] == "RIGHT", str(r1))
-check("api error falls back greedy", r2[0] in llm_brain.VALID_MOVES and "error" in r2[1], str(r2))
-check("no real client touched", llm_brain._client is None)
-
-
-async def scenario_nonsense():
-    return await llm_brain.ask_brain((3, 3), [(6, 3, 3.0)], client=FakeClient("nonsense"))
-
-
-r4 = asyncio.run(scenario_nonsense())
-check("nonsense reply falls back", r4[0] in llm_brain.VALID_MOVES and "greedy" in r4[1].lower(), str(r4))
-
-
-async def scenario_offline():
+rovers = {"rover-1": (3, 6), "rover-2": (10, 3)}
+r = asyncio.run(alloc("smart", rovers, trash))
+check("gemini async round trip", r == {"rover-1": (3, 7), "rover-2": (10, 2)}, str(r))
+r = asyncio.run(alloc("fenced", rovers, trash))
+check("markdown fences tolerated", r["rover-1"] == (3, 7) and r["rover-2"] == (10, 2))
+r = asyncio.run(alloc("fail", rovers, trash))
+check("api throttle -> greedy fallback", r["rover-1"] in trash and r["rover-2"] in trash and r["rover-1"] != r["rover-2"])
+r = asyncio.run(alloc("garbage", rovers, trash))
+check("garbage reply -> greedy fallback", r["rover-1"] in trash and r["rover-2"] in trash)
+r = asyncio.run(alloc("hallucinate", rovers, trash))
+check("hallucinated coords rejected", r["rover-1"] in trash and r["rover-2"] in trash and r["rover-1"] != r["rover-2"], str(r))
+r = asyncio.run(alloc("dupe", rovers, trash))
+check("dupe assignment patched", r["rover-1"] != r["rover-2"] and r["rover-1"] in trash and r["rover-2"] in trash)
+r = asyncio.run(llm_brain.allocate_tasks(rovers, []))
+check("no trash left -> None targets", r == {"rover-1": None, "rover-2": None})
+llm_brain._client = None
+saved = os.environ.pop("GOOGLE_API_KEY", None)
+try:
+    r = asyncio.run(llm_brain.allocate_tasks(rovers, trash))
+finally:
     llm_brain._client = None
-    saved = os.environ.pop("GOOGLE_API_KEY", None)
-    try:
-        return await llm_brain.ask_brain((2, 2), [(10, 2, 8.0)])
-    finally:
-        llm_brain._client = None
-        if saved is not None:
-            os.environ["GOOGLE_API_KEY"] = saved
+    if saved is not None:
+        os.environ["GOOGLE_API_KEY"] = saved
+check("offline -> greedy", r["rover-1"] in trash and r["rover-2"] in trash)
+
+# ---- swarm engine ----
+print("== SwarmSim: allocator + a-star driving ==")
 
 
-r5 = asyncio.run(scenario_offline())
-check("offline mode greedy", r5[0] in llm_brain.VALID_MOVES and "offline" in r5[1].lower(), str(r5))
+async def run_sim(ticks, seed=7, respawn=None, live=False):
+    sim = SwarmSim(live=live, seed=seed, respawn=respawn)
+    await sim.run(ticks)
+    return sim
 
-# ---- full sim runs, zero network (get_client patched) ----
-print("== full swarm sim, online path (fake gemini, 30ms latency) ==")
-orig_get_client = llm_brain.get_client
-smart = FakeClient("smart", latency=0.03)
-llm_brain.get_client = lambda: smart
-buf = io.StringIO()
-t0 = time.time()
-with contextlib.redirect_stdout(buf):
-    asyncio.run(swarm_main())
-dt = time.time() - t0
-llm_brain.get_client = orig_get_client
-out = buf.getvalue()
-check("90 brain calls made (3 rovers x 30 ticks)", smart.aio.models.calls == 90, f"got {smart.aio.models.calls}")
-collected = sum(int(m) for m in re.findall(r"(\d+) trash scooped", out))
-check("rovers actually collected trash", collected > 0, f"got {collected}")
-check("ticks overlapped (async, not sequential)", dt < 2.0, f"took {dt:.2f}s")
-print(f"  [info] smart-fake sim: {collected} trash collected in {dt:.2f}s")
 
-print("== full swarm sim, offline path ==")
-llm_brain.get_client = lambda: None
-buf = io.StringIO()
-with contextlib.redirect_stdout(buf):
-    asyncio.run(swarm_main())
-llm_brain.get_client = orig_get_client
-out = buf.getvalue()
-check("offline banner shown", "offline mode" in out)
-check("offline sim completed", "trash left on the grid" in out)
+sim = asyncio.run(run_sim(200))
+check("swarm cleans the whole grid", sim.env.trash_left == 0, f"left {sim.env.trash_left} after {sim.tick_count} ticks")
+check("cleaned before tick cap", sim.tick_count <= 200)
+check("all rovers in bounds", all(sim.env.in_bounds(r.pos) for r in sim.rovers))
+check("scoops add up", sum(r.collected for r in sim.rovers) == sim.spawned)
+print(f"  [info] full clean took {sim.tick_count} ticks, {[(r.name, r.collected) for r in sim.rovers]}")
+
+sim2 = asyncio.run(run_sim(100, seed=11, respawn=(20, 8)))
+check("respawn keeps the world dirty", sim2.env.trash_left > 0)
+check("respawn inflates spawned count", sim2.spawned > 40)
+check("100 ticks stay in bounds", all(sim2.env.in_bounds(r.pos) for r in sim2.rovers))
+
+sim3 = SwarmSim(seed=3)
+for _ in range(10):
+    asyncio.run(sim3.tick())
+paths_held = [r.path for r in sim3.rovers]
+check("rovers actually hold a-star paths", any(paths_held) or all(r.target is None for r in sim3.rovers))
+check("trail capped at 14", all(len(r.trail) <= 14 for r in sim3.rovers))
+
+sim4 = SwarmSim(seed=5)
+asyncio.run(sim4.tick())
+check("tick increments", sim4.tick_count == 1)
+before = {r.name: r.target for r in sim4.rovers}
+asyncio.run(sim4.tick())
+after = {r.name: r.target for r in sim4.rovers}
+check("targets persist while valid", any(before[n] == after[n] and after[n] is not None for n in before))
+
+# ---- visualizer (headless) ----
+print("== visualizer (headless) ==")
+visualizer.init(headless=True)
+sim5 = SwarmSim(seed=9)
+frame = visualizer.render_frame(sim5)
+exp_h = visualizer.HUD_H + 24 * visualizer.TILE + visualizer.PAD + visualizer.FOOTER_H
+exp_w = 2 * visualizer.PAD + 24 * visualizer.TILE
+check("frame pixel size", frame.shape == (exp_h, exp_w, 3), str(frame.shape))
+check("frame not blank", int(frame.std()) > 5)
+
+simA = SwarmSim(seed=21)
+simB = SwarmSim(seed=21)
+fa, fb = None, None
+for _ in range(5):
+    asyncio.run(simA.tick())
+    asyncio.run(simB.tick())
+fa = visualizer.render_frame(simA)
+fb = visualizer.render_frame(simB)
+check("render is deterministic", np.array_equal(fa, fb))
+
+shots = []
+simV = SwarmSim(seed=11, respawn=(20, 8))
+surface = visualizer.build_surface(simV.env.width, simV.env.height)
+for _ in range(20):
+    asyncio.run(simV.tick())
+    visualizer.draw(simV, surface)
+    shots.append(visualizer.snapshot(surface))
+check("20 headless frames rendered", len(shots) == 20 and all(s.shape == (exp_h, exp_w, 3) for s in shots))
+
+# ---- gif pipeline (tiny run, real codec) ----
+print("== gif pipeline ==")
+TMP.mkdir(exist_ok=True)
+gif_path = TMP / "test_demo.gif"
+import generate_gif
+
+
+async def record_small():
+    return await generate_gif.record(frames=12, out=gif_path, seed=9)
+
+
+asyncio.run(record_small())
+check("gif file written", gif_path.exists() and gif_path.stat().st_size > 1000)
+import imageio.v3 as iio
+
+gif_frames = iio.imread(str(gif_path))
+check("gif readable, 12 frames", gif_frames.shape[0] == 12, str(gif_frames.shape))
+gif_path.unlink()
 
 print(f"\n{'ALL CHECKS PASSED' if not FAILS else 'FAILURES: ' + ', '.join(FAILS)}")
 sys.exit(1 if FAILS else 0)

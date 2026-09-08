@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import heapq
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -14,6 +15,14 @@ MOVES = {
     "RIGHT": (1, 0),
 }
 
+# flipped so the driving code can turn a step delta back into a move name
+DIR_NAMES = {delta: name for name, delta in MOVES.items()}
+
+
+def manhattan(a, b) -> int:
+    # the a-star heuristic AND the real walk cost on a 4-dir grid
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
 
 @dataclass
 class Rover:
@@ -23,6 +32,9 @@ class Rover:
     collected: int = 0
     stalls: int = 0
     moves: int = 0
+    target: tuple | None = None  # the trash the allocator told this rover to go get
+    path: list = field(default_factory=list)  # remaining a-star steps to that target
+    trail: list = field(default_factory=list)  # last few tiles, purely for the visualizer glow
 
 
 class GridEnv:
@@ -53,7 +65,7 @@ class GridEnv:
         return len(fresh)
 
     def nearby_trash(self, pos, radius: int = 6, limit: int = 8) -> list:
-        # one vectorized hypot instead of a python loop over every trash item. numpy carries
+        # kept for sensor-style queries. the allocator sees the whole board now
         if self.trash.size == 0:
             return []
         dists = np.hypot(self.trash[:, 0] - pos[0], self.trash[:, 1] - pos[1])
@@ -62,7 +74,7 @@ class GridEnv:
             return []
         coords = self.trash[close]
         picked = dists[close]
-        # nearest first, capped, so the llm prompt stays small and actually useful
+        # nearest first, capped, so prompts and logs stay small
         order = np.argsort(picked)[:limit]
         return [(int(coords[i][0]), int(coords[i][1]), round(float(picked[i]), 2)) for i in order]
 
@@ -82,15 +94,47 @@ class GridEnv:
     def move(self, pos, direction: str):
         # walls win. never letting a rover clip out and corrupt the sim state
         if direction not in MOVES:
-            return pos, False  # model said some nonsense, rover just idles this tick
+            return pos, False  # nonsense direction, rover just idles this tick
         dx, dy = MOVES[direction]
         nxt = (pos[0] + dx, pos[1] + dy)
         if self.in_bounds(nxt):
             return nxt, True
         return pos, False  # bumped the wall, stay put
 
+    def astar(self, start, goal, blocked=frozenset()):
+        # real a-star: heapq open set, manhattan heuristic, 4 directions.
+        # trash tiles are walkable, only the walls (or the blocked set) stop you
+        if not self.in_bounds(start) or not self.in_bounds(goal):
+            return None
+        if start in blocked or goal in blocked:
+            return None
+        g_score = {start: 0}
+        came_from = {}
+        open_heap = [(manhattan(start, goal), 0, start)]
+        while open_heap:
+            _, g, cur = heapq.heappop(open_heap)
+            if cur == goal:
+                # walk the chain backwards to rebuild the full path
+                path = [cur]
+                while cur in came_from:
+                    cur = came_from[cur]
+                    path.append(cur)
+                return path[::-1]
+            if g > g_score.get(cur, float("inf")):
+                continue  # stale heap entry, we already found a cheaper way here
+            for dx, dy in MOVES.values():
+                nxt = (cur[0] + dx, cur[1] + dy)
+                if not self.in_bounds(nxt) or nxt in blocked:
+                    continue
+                ng = g + 1
+                if ng < g_score.get(nxt, float("inf")):
+                    g_score[nxt] = ng
+                    came_from[nxt] = cur
+                    heapq.heappush(open_heap, (ng + manhattan(nxt, goal), ng, nxt))
+        return None  # unreachable, only happens when the goal is fully walled off
+
     def render(self, rovers=()) -> str:
-        # ascii dump for the terminal. proper viz comes later, this one is free
+        # ascii dump for the terminal. the pygame view handles the pretty stuff
         canvas = [["." for _ in range(self.width)] for _ in range(self.height)]
         for x, y in self.trash:
             canvas[int(y)][int(x)] = "#"
