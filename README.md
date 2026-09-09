@@ -17,7 +17,7 @@ i started this after a road trip from konkan to mumbai — kilometers of plastic
 
 ## how it works (under the hood)
 
-![swarm mindmap](assets/mindmap.svg)
+![swarm mindmap](assets/mindmap.png)
 
 ```
    task allocator                      a-star + manhattan
@@ -109,7 +109,7 @@ before the python pivot there was a playable 3d web game — first-person rover,
 ## assets
 
 - `assets/demo.gif` — the run above, auto-captured from the actual sim
-- `assets/mindmap.svg` — how the rovers sense, think, plan and talk, formulas included
+- `assets/mindmap.png` — how the rovers sense, think, plan and talk, formulas included
 - `assets/envrover_model_1.0.png` — 1.0 design render
 - `assets/ENV-ROVER_Technical_Doc.pdf` — original concept doc
 - `assets/IMG_0186.PNG`, `assets/3dMODEL-env-rover-1.0-rough.zip` — early tinkercad model
