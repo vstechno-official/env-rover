@@ -16,7 +16,6 @@ from core import llm_brain
 TILE_W = 44  # tile width in px
 TILE_H = 22  # tile height in px (half of W, classic iso ratio)
 BLOCK_H = 18  # how tall blocks stand off the ground
-TILE = 22  # legacy flat-tile size, kept for hud math
 
 PAD_X = 60
 HUD_H = 46
@@ -104,13 +103,13 @@ def _draw_feed_panel(sim, surface):
     fonts = _state["fonts"]
     w, h = surface.get_size()
     panel_h = 196
+    # needs a real srcalpha surface, draw.rect silently drops the alpha byte
     panel = pygame.Surface((FEED_W - 24, panel_h), pygame.SRCALPHA)
     panel.fill((8, 10, 12, FEED_BG_ALPHA))
-    pygame.draw.rect(surface, (8, 10, 12, FEED_BG_ALPHA), (12, h - panel_h - 12, FEED_W - 24, panel_h), border_radius=8)
+    surface.blit(panel, (12, h - panel_h - 12))
     pygame.draw.rect(surface, GRID_RIGHT, (12, h - panel_h - 12, FEED_W - 24, panel_h), 2, border_radius=8)
 
-    # title bar with the brain name
-    brain_label = fonts["small"].render(f"BRAIN FEED // {llm_brain.brain_name}", True, ROVER_ACCENT)
+    brain_label = fonts["small"].render("brain feed", True, ROVER_ACCENT)
     surface.blit(brain_label, (24, h - panel_h - 2))
     tag_colors = {
         "brain": (0, 229, 255),
@@ -134,9 +133,8 @@ def _draw_feed_panel(sim, surface):
 def _draw_hud(sim, surface):
     fonts = _state["fonts"]
     w = surface.get_width()
-    surface.blit(fonts["title"].render("ENV-ROVER // ISOMETRIC SWARM SIM", True, TEXT_BRIGHT), (PAD_X, 10))
-    mode = f"{llm_brain.brain_name} allocs - a-star drives" if llm_brain.brain_name != "greedy" else "greedy allocs - a-star drives"
-    surface.blit(fonts["small"].render(mode, True, TEXT_DIM), (PAD_X, 30))
+    surface.blit(fonts["title"].render("ENV-ROVER", True, TEXT_BRIGHT), (PAD_X, 10))
+    surface.blit(fonts["small"].render(llm_brain.brain_name, True, TEXT_DIM), (PAD_X, 30))
 
     tick = fonts["hud"].render(f"TICK {sim.tick_count:03d}", True, ROVER_ACCENT)
     surface.blit(tick, (w - PAD_X - tick.get_width(), 10))
@@ -155,8 +153,8 @@ def _draw_hud(sim, surface):
         label = small.render(f"{rover.name} {rover.collected}", True, TEXT_DIM)
         surface.blit(label, (x + 13, fy))
         x += 13 + label.get_width() + 18
-    info = small.render(f"{len(sim.rovers)} rovers - {sim.env.width}x{sim.env.height} grid - iso 2.5d", True, TEXT_DIM)
-    surface.blit(info, (w - PAD_X - info.get_width(), fy))
+    gridinfo = small.render(f"{len(sim.rovers)} rovers - {sim.env.width}x{sim.env.height} grid", True, TEXT_DIM)
+    surface.blit(gridinfo, (w - PAD_X - gridinfo.get_width(), fy))
 
 
 def draw(sim, surface):
@@ -230,7 +228,7 @@ def run_live(fps=10, seed=11, brain=None):
         brain = "greedy"
     sim = SwarmSim(brain=brain, seed=seed, respawn=(20, 8))
     surface = build_surface(sim.env.width, sim.env.height)
-    pygame.display.set_caption("env-rover // isometric swarm sim")
+    pygame.display.set_caption("env-rover")
     screen = pygame.display.set_mode(surface.get_size())
     clock = pygame.time.Clock()
     running = True
