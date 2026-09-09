@@ -94,6 +94,10 @@ python tests/test_sim.py
 
 no api key? everything still runs — the greedy allocator covers it, so the swarm moves whether or not gemini shows up.
 
+## the game
+
+before the python pivot there was a playable 3d web game — first-person rover, waste collection, 5 levels. it still lives at [envroverimplemento.netlify.app](https://envroverimplemento.netlify.app) and the full source is in `envroverimplemento/` (index.html + game.js, three.js, zero build step). beat all 5 levels and it hands you a pdf certificate of environmental awareness, jsPDF-generated in the browser. fixed the cert render (the title and footer used to punch through the borders and the score line printed on top of the body text).
+
 ## assets
 
 - `assets/demo.gif` — the run above, auto-captured from the actual sim
