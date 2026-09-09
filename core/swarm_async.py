@@ -16,11 +16,12 @@ MAX_TICKS = 80
 class SwarmSim:
     # the whole swarm in one object so the cli, the visualizer and the gif
     # generator all run the exact same sim
-    def __init__(self, width=GRID_W, height=GRID_H, trash=TOTAL_TRASH, live=False, seed=None, respawn=None):
+    def __init__(self, width=GRID_W, height=GRID_H, trash=TOTAL_TRASH, brain="greedy", seed=None, respawn=None, on_feed=None):
         self.env = GridEnv(width, height, seed=seed)
         self.spawned = self.env.spawn_trash(trash)
         self.respawn = respawn  # (every_n_ticks, count) so demo runs never go boring
-        self.live = live  # live=True pings gemini for allocations, else greedy all day
+        self.brain = brain  # "greedy" | "gemini" | "ollama:<model>"
+        llm_brain.set_brain(brain)
         self.tick_count = 0
         self.rovers = []
         for i, name in enumerate(ROVER_NAMES):
@@ -37,17 +38,19 @@ class SwarmSim:
         return rover.target is not None and rover.target in self._trash_set()
 
     async def _allocate(self):
-        # one gemini call hands out one target to every rover that needs one
+        # one llm call hands out one target to every rover that needs one
         needing = {r.name: r.pos for r in self.rovers if not self._target_valid(r)}
         if not needing:
             return
         claimed = {r.target for r in self.rovers if self._target_valid(r)}
         free_trash = [t for t in self._trash_set() if t not in claimed]
-        if self.live:
-            assignments = await llm_brain.allocate_tasks(needing, free_trash)
-        else:
-            # a-star handles the actual driving so we dont burn gemini tokens
+        if self.brain == "greedy":
             assignments = llm_brain.greedy_assignment(needing, free_trash)
+            for name, coord in assignments.items():
+                if coord is not None:
+                    llm_brain.log_feed(f"{name} -> ({coord[0]},{coord[1]})", "chat")
+        else:
+            assignments = await llm_brain.allocate_tasks(needing, free_trash)
         for rover in self.rovers:
             if rover.name in assignments:
                 self._assign(rover, assignments[rover.name])
@@ -99,15 +102,44 @@ class SwarmSim:
                 break
 
 
+def pick_brain():
+    # the startup menu. gemini = cloud brain, ollama = runs on your own machine
+    print("\n=== env-rover // pick your brain ===")
+    print("  1) gemini 3.8 flash   (cloud, needs GOOGLE_API_KEY)")
+    print("  2) ollama local model (runs on your machine, zero tokens)")
+    choice = input("\nselect brain [1/2, enter = greedy]: ").strip().lower()
+    if choice == "1":
+        return "gemini"
+    if choice == "2":
+        return pick_ollama_model()
+    return "greedy"
+
+
+def pick_ollama_model():
+    # pulls the user's actual installed models straight from `ollama list`
+    models = llm_brain.list_ollama_models()
+    if not models:
+        print("  no ollama models found (is the ollama app running?), using greedy")
+        return "greedy"
+    print("\n  local models on your machine:")
+    for i, m in enumerate(models, 1):
+        print(f"    {i}) {m}")
+    raw = input("\n  pick a model (number or full name): ").strip()
+    if raw.isdigit() and 1 <= int(raw) <= len(models):
+        return f"ollama:{models[int(raw) - 1]}"
+    if raw in models:
+        return f"ollama:{raw}"
+    print("  didnt catch that, using greedy")
+    return "greedy"
+
+
 async def main():
-    live = llm_brain.get_client() is not None
-    if live:
-        print(f"brain online: {llm_brain.DEFAULT_MODEL} allocates, a-star drives")
-    else:
-        print("no GOOGLE_API_KEY in .env, running offline mode (greedy allocator, zero llm calls)")
-    sim = SwarmSim(live=live, seed=7)
-    print(f"spawned {sim.spawned} trash on a {sim.env.width}x{sim.env.height} grid, {len(sim.rovers)} rovers dropping in\n")
-    print(sim.env.render(sim.rovers) + "\n")
+    brain = pick_brain()
+    if brain == "gemini" and llm_brain.get_client() is None:
+        print("no GOOGLE_API_KEY in .env, falling back to greedy")
+        brain = "greedy"
+    sim = SwarmSim(brain=brain, seed=7)
+    print(f"\nbrain: {brain} | spawned {sim.spawned} trash on a {sim.env.width}x{sim.env.height} grid\n")
 
     def line(s):
         parts = []

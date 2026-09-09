@@ -6,7 +6,7 @@ three autonomous rovers, one dirty grid, zero humans needed. this is the simulat
 
 the whole thing runs on a split brain:
 
-- **gemini 3.8 flash** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else.
+- **the task allocator** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else. pick your brain at startup: **gemini 3.8 flash** (cloud) or any **ollama** model running on your own machine, zero tokens, and the hud shows its thinking stream live.
 - **a-star + manhattan distance** is the driver. once a rover gets its target, classic pathfinding walks it there step by step. no tokens burned on steering.
 
 the llm never touches the wheel. the math never gets creative. each covers the other's weakness and the swarm just cleans.
@@ -17,27 +17,31 @@ i started this after a road trip from konkan to mumbai — kilometers of plastic
 
 ## how it works (under the hood)
 
+![swarm mindmap](assets/mindmap.svg)
+
 ```
-   gemini 3.8 flash                    a-star + manhattan
-   task allocator        ->            steering
-   (who goes after what)               (how to actually get there)
+   task allocator                      a-star + manhattan
+   (gemini or ollama)     ->           steering
+   who goes after what                 how to actually get there
 ```
 
 every tick, three things happen:
 
-1. **allocate** — rovers with no valid target ping the allocator. gemini sees every rover position plus every trash coordinate and replies with json assigning exactly one trash tile to each rover. async, so no rover ever blocks another.
+1. **allocate** — rovers with no valid target ping the allocator. the brain sees every rover position plus every trash coordinate and replies with json assigning exactly one trash tile to each rover. async, so no rover ever blocks another. the ollama path streams the model's reasoning tokens straight into the hud's brain feed panel, so you literally watch it think.
 2. **drive** — each rover runs a-star (heapq open set, manhattan heuristic, 4 directions) to its assigned target and takes one step down that path per tick. trash tiles are walkable, only the grid walls aren't.
-3. **scoop** — stand on trash and it's gone. if another rover grabs your target mid-drive, your target dies and the next allocation round hands you a new one.
+3. **scoop** — stand on trash and it's gone. if another rover scoops your target mid-drive, your target dies and the next allocation round hands you a new one.
 
-why split it like this: llm calls are slow and cost money but they're good at judgment. a-star is instant and free but has zero judgment. one gemini call allocates for the whole swarm, then the math drives until the world changes. and when gemini throttles, hallucinates a coordinate that isn't even on the trash list, or wraps its json in markdown fences for no reason — a greedy nearest-unclaimed-trash allocator takes over and the swarm never stalls. the fallback is also the benchmark: if the llm can't out-allocate a 15-line greedy function, it hasn't earned its tokens yet.
+why split it like this: llm calls are slow and cost money but they're good at judgment. a-star is instant and free but has zero judgment. one call allocates for the whole swarm, then the math drives until the world changes. and when the brain throttles, hallucinates a coordinate that isn't even on the trash list, or wraps its json in markdown fences for no reason — a greedy nearest-unclaimed-trash allocator takes over and the swarm never stalls. the fallback is also the benchmark: if the llm can't out-allocate a 15-line greedy function, it hasn't earned its tokens yet.
+
+the isometric view is 2.5d, not a real 3d engine — the projection is two lines of math: `screen_x = (x - y) * (TILE_W / 2)`, `screen_y = (x + y) * (TILE_H / 2)`. every block is three polygons (top + left + right faces) with different shades to fake lighting. full 3d engines are bloat for what this needs.
 
 ### repo layout
 
 ```
-core/llm_brain.py          gemini 3.8 flash task allocator, async, json + greedy fallback
-core/swarm_async.py        SwarmSim engine: allocate -> drive -> scoop, every tick
+core/llm_brain.py          task allocator: gemini or ollama backend, async, json + greedy fallback
+core/swarm_async.py        SwarmSim engine + the startup brain picker (gemini / ollama / greedy)
 simulation/grid_env.py     numpy grid world, manhattan, a-star, trash, walls
-simulation/visualizer.py   pygame renderer, retro-hacker terminal aesthetic
+simulation/visualizer.py   isometric 2.5d pygame renderer + live brain feed hud
 generate_gif.py            runs the swarm headless and records assets/demo.gif
 tests/test_sim.py          46 checks, zero network needed
 ```
@@ -45,13 +49,14 @@ tests/test_sim.py          46 checks, zero network needed
 ### roadmap, honest version
 
 done:
-- neuro-symbolic split: gemini allocates, a-star drives
+- neuro-symbolic split: llm allocates, a-star drives
+- dual brain: gemini 3.8 flash (cloud) or any local ollama model, picked at startup
 - 3-rover async swarm, full board cleans in ~70 ticks
-- pygame visualizer + auto-generated demo gif
+- isometric minecraft-style visualizer + live brain feed hud + auto-generated demo gif
 - a-star verified optimal against a bfs reference on 30 random cases
 
 in progress:
-- allocator prompt tuning, gemini still makes the occasional lazy pick
+- allocator prompt tuning, the models still make the occasional lazy pick
 - benchmarks: llm vs greedy allocation over many seeded runs
 
 later, much later:
@@ -74,7 +79,9 @@ headless sim in the terminal:
 python core/swarm_async.py
 ```
 
-pygame window with the full visual stack:
+it asks which brain to run with first — gemini (needs `GOOGLE_API_KEY`), ollama (lists your installed models and lets you pick), or greedy (offline, no key, no llm).
+
+pygame window with the full isometric visual stack:
 
 ```
 python simulation/visualizer.py
@@ -83,7 +90,8 @@ python simulation/visualizer.py
 regenerate the demo gif (100 frames, fixed seed, fully reproducible):
 
 ```
-python generate_gif.py
+python generate_gif.py              # greedy brain, fast
+python generate_gif.py ollama:qwen3.5:cloud   # any ollama model you have
 ```
 
 run the test suite:
@@ -101,6 +109,7 @@ before the python pivot there was a playable 3d web game — first-person rover,
 ## assets
 
 - `assets/demo.gif` — the run above, auto-captured from the actual sim
+- `assets/mindmap.svg` — how the rovers sense, think, plan and talk, formulas included
 - `assets/envrover_model_1.0.png` — 1.0 design render
 - `assets/ENV-ROVER_Technical_Doc.pdf` — original concept doc
 - `assets/IMG_0186.PNG`, `assets/3dMODEL-env-rover-1.0-rough.zip` — early tinkercad model
