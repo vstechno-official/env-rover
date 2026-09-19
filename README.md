@@ -115,3 +115,6 @@ before the python pivot there was a playable 3d web game — first-person rover,
 - `assets/IMG_0186.PNG`, `assets/3dMODEL-env-rover-1.0-rough.zip` — early tinkercad model
 
 progress log: `WORK-LOGS/whatididanddoing.md`
+
+##### Signing off,
+#### Vedant
