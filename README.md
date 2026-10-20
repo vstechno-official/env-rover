@@ -2,16 +2,17 @@
 
 # env-rover
 
-three autonomous rovers, one dirty grid, zero humans needed. this is the simulation backend for a swarm of trash-collecting rovers — the kind that will one day roll down real roads scooping up the plastic nobody should have to pick up by hand.
+Hi Reader:),
+Environment rover is basically if NASA-Mars-rover and Openai's Swarm had many babies who liked to help clean te environment efficiently and without any external instructions(after allocation and determination of the target area).
+# inspiration
+i started this after a road trip from konkan to mumbai — kilometers of plastic along the shoulder, over and over. that image never left. tech isn't the opposite of nature, it's the tool that gives nature its space back.
+# THe nerdy part
+for the function, the whole thing runs on a split brain:
 
-the whole thing runs on a split brain:
+- **the task allocator** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else. pick your brain at startup: **gemini 3.8 flash** (cloud) or any **ollama** model(bcz paid apis almost f uped my pocket money) running on your own machine, and the hud shows its thinking stream live: THis u can basically TRY urself out via this github repository and simulation.
+- **a-star + manhattan distance** is the driver. once a rover gets its target, classic pathfinding walks it there step by step. no tokens burned on steering, yeah because even my pc has a limit to running local models.
 
-- **the task allocator** is mission control. it stares at the board and decides who goes where — pure task allocation, one async json call per round, nothing else. pick your brain at startup: **gemini 3.8 flash** (cloud) or any **ollama** model running on your own machine, zero tokens, and the hud shows its thinking stream live.
-- **a-star + manhattan distance** is the driver. once a rover gets its target, classic pathfinding walks it there step by step. no tokens burned on steering.
-
-the llm never touches the wheel. the math never gets creative. each covers the other's weakness and the swarm just cleans.
-
-i started this after a road trip from konkan to mumbai — kilometers of plastic along the shoulder, over and over. that image never left. tech isn't the opposite of nature, it's the tool that gives nature its space back. env-rover is me building toward that, one tick at a time.
+the llm never touches the wheel. the math never gets creative. each covers the other's weakness and the swarm just cleans. and this is fuckin efficient.
 
 **status: currently building the python sim backend, hardware integration comes later.**
 
@@ -104,7 +105,7 @@ no api key? everything still runs — the greedy allocator covers it, so the swa
 
 ## the game
 
-before the python pivot there was a playable 3d web game — first-person rover, waste collection, 5 levels. it still lives at [envroverimplemento.netlify.app](https://envroverimplemento.netlify.app) and the full source is in `envroverimplemento/` (index.html + game.js, three.js, zero build step). beat all 5 levels and it hands you a pdf certificate of environmental awareness, jsPDF-generated in the browser. fixed the cert render (the title and footer used to punch through the borders and the score line printed on top of the body text).
+before the python pivot there was(is) a playable 3d web game — first-person rover, waste collection, 5 levels. it still lives at [envroverimplemento.netlify.app](https://envroverimplemento.netlify.app) and the full source is in `envroverimplemento/` (index.html + game.js, three.js, zero build step). beat all 5 levels and it hands you a pdf certificate of environmental awareness, jsPDF-generated in the browser. fixed the cert render (the title and footer used to punch through the borders and the score line printed on top of the body text).
 
 ## assets
 
